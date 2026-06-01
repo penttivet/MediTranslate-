@@ -41,7 +41,7 @@ input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd;
 .result.show { display: block; }
 .result-title { font-weight: 700; margin-bottom: 8px; color: #333; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
 .result-text { font-size: 14px; line-height: 1.8; color: #444; white-space: pre-wrap; }
-.result-text.arabic { direction: rtl; text-align: right; font-size: 16px; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+.result-text.arabic { direction: rtl; text-align: right; font-size: 16px; }
 .divider { border: none; border-top: 1px solid #ddd; margin: 12px 0; }
 .section-box { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .section-box.arabic-box { border-right: 4px solid #1a8a5a; }
@@ -71,29 +71,23 @@ input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd;
 <button class="clear-btn" onclick="clearAll()">🗑️ Clear / مسح</button>
 
 <div id="result" class="result">
-
   <div class="section-box arabic-box">
-    <div class="result-title">🎙️ النص الأصلي / Original (العربية)</div>
+    <div class="result-title">🎙️ النص الأصلي (العربية) / Original Arabic</div>
     <div class="result-text arabic" id="text_ar"></div>
   </div>
-
   <div class="section-box english-box">
-    <div class="result-title">🎙️ Original Text (English)</div>
+    <div class="result-title">🎙️ Original English Text</div>
     <div class="result-text" id="text_en"></div>
   </div>
-
   <div class="divider"></div>
-
-  <div class="section-box arabic-box">
-    <div class="result-title">🔄 الترجمة إلى العربية / Arabic Translation</div>
-    <div class="result-text arabic" id="translation_ar"></div>
-  </div>
-
   <div class="section-box english-box">
     <div class="result-title">🔄 English Translation</div>
     <div class="result-text" id="translation_en"></div>
   </div>
-
+  <div class="section-box arabic-box">
+    <div class="result-title">🔄 الترجمة إلى العربية / Arabic Translation</div>
+    <div class="result-text arabic" id="translation_ar"></div>
+  </div>
 </div>
 </div>
 
@@ -114,6 +108,7 @@ function setLang(lang) {
 }
 
 function appendText(id, newText) {
+  if (!newText) return;
   const el = document.getElementById(id);
   const sep = '\\n\\n— ' + new Date().toLocaleTimeString() + ' —\\n';
   el.textContent = el.textContent ? el.textContent + sep + newText : newText;
@@ -156,12 +151,10 @@ async function process() {
   const btn = document.getElementById('submit_btn');
   btn.disabled = true;
   btn.textContent = selectedLang === 'ar' ? '⏳ جارٍ الترجمة...' : '⏳ Translating...';
-
   try {
     const formData = new FormData();
     formData.append('audio', recordedAudio, 'audio.webm');
     formData.append('lang', selectedLang);
-
     const transcribeRes = await fetch('/transcribe', { method: 'POST', body: formData });
     const transcribeData = await transcribeRes.json();
     if (!transcribeRes.ok) throw new Error(transcribeData.error);
@@ -176,19 +169,14 @@ async function process() {
 
     if (selectedLang === 'ar') {
       appendText('text_ar', transcribeData.text);
-      appendText('text_en', '');
-      appendText('translation_ar', '');
       appendText('translation_en', translateData.translation);
     } else {
       appendText('text_en', transcribeData.text);
-      appendText('text_ar', '');
-      appendText('translation_en', '');
       appendText('translation_ar', translateData.translation);
     }
 
     document.getElementById('result').classList.add('show');
     document.getElementById('download_btn').style.display = 'block';
-
   } catch (e) {
     alert('Error: ' + e.message);
   } finally {
@@ -199,25 +187,22 @@ async function process() {
 
 function downloadAndClear() {
   const title = document.getElementById('session_title').value || 'session';
-  let content = `MEDITRANSLATE - ${title}\\n`;
-  content += `Date: ${new Date().toLocaleString()}\\n`;
-  content += `${'='.repeat(50)}\\n\\n`;
-
+  let content = 'MEDITRANSLATE - ' + title + '\\n';
+  content += 'Date: ' + new Date().toLocaleString() + '\\n';
+  content += '='.repeat(50) + '\\n\\n';
   const ar = document.getElementById('text_ar').textContent;
   const en = document.getElementById('text_en').textContent;
-  const trAr = document.getElementById('translation_ar').textContent;
   const trEn = document.getElementById('translation_en').textContent;
-
-  if (ar) content += `ARABIC ORIGINAL / النص العربي:\\n${ar}\\n\\n`;
-  if (en) content += `ENGLISH ORIGINAL:\\n${en}\\n\\n`;
-  if (trEn) content += `ENGLISH TRANSLATION:\\n${trEn}\\n\\n`;
-  if (trAr) content += `ARABIC TRANSLATION / الترجمة العربية:\\n${trAr}\\n`;
-
+  const trAr = document.getElementById('translation_ar').textContent;
+  if (ar) content += 'ARABIC ORIGINAL:\\n' + ar + '\\n\\n';
+  if (en) content += 'ENGLISH ORIGINAL:\\n' + en + '\\n\\n';
+  if (trEn) content += 'ENGLISH TRANSLATION:\\n' + trEn + '\\n\\n';
+  if (trAr) content += 'ARABIC TRANSLATION:\\n' + trAr + '\\n';
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `meditranslate_${title.replace(/\\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.download = 'meditranslate_' + title.replace(/\\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.txt';
   a.click();
   URL.revokeObjectURL(url);
   setTimeout(() => clearAll(), 500);
@@ -269,20 +254,10 @@ def translate():
         data = request.json
         text = data['text']
         lang = data.get('lang', 'ar')
-
         if lang == 'ar':
-            prompt = f"""You are a professional medical interpreter.
-Translate the following Arabic text to English accurately and completely.
-Return ONLY the English translation, nothing else.
-
-Arabic text: {text}"""
+            prompt = f"You are a professional medical interpreter. Translate the following Arabic text to English accurately and completely. Return ONLY the English translation, nothing else.\n\nArabic text: {text}"
         else:
-            prompt = f"""أنت مترجم طبي محترف.
-ترجم النص الإنجليزي التالي إلى العربية بدقة وبشكل كامل.
-أعد الترجمة العربية فقط، لا شيء آخر.
-
-English text: {text}"""
-
+            prompt = f"أنت مترجم طبي محترف. ترجم النص الإنجليزي التالي إلى العربية بدقة وبشكل كامل. أعد الترجمة العربية فقط، لا شيء آخر.\n\nEnglish text: {text}"
         r = requests.post(
             'https://api.anthropic.com/v1/messages',
             headers={
@@ -298,10 +273,8 @@ English text: {text}"""
         )
         if r.status_code != 200:
             return jsonify({'error': 'Translation failed'}), 500
-
         translation = r.json()['content'][0]['text'].strip()
         return jsonify({'translation': translation})
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
