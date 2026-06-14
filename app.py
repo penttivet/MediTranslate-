@@ -354,6 +354,76 @@ def translate():
         return jsonify({'error': str(e)}), 500
 
 
+ADMIN_HTML = (
+    '<!DOCTYPE html>'
+    '<html lang="en"><head>'
+    '<meta charset="UTF-8">'
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
+    '<title>MediTranslate Admin</title>'
+    '<style>'
+    '* { margin: 0; padding: 0; box-sizing: border-box; }'
+    'body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #1a1a2e; min-height: 100vh; padding: 20px; color: #fff; }'
+    'h1 { color: #2ed573; margin-bottom: 5px; font-size: 24px; }'
+    '.subtitle { color: #888; margin-bottom: 25px; font-size: 13px; }'
+    '.back { color: #2ed573; text-decoration: none; font-size: 13px; display: inline-block; margin-bottom: 20px; }'
+    'table { width: 100%; border-collapse: collapse; background: #16213e; border-radius: 12px; overflow: hidden; }'
+    'th { background: #0f3460; padding: 12px 15px; text-align: left; font-size: 12px; text-transform: uppercase; color: #2ed573; }'
+    'td { padding: 12px 15px; border-bottom: 1px solid #1a2a4a; font-size: 14px; }'
+    'tr:last-child td { border-bottom: none; }'
+    'tr:hover td { background: rgba(46,213,115,0.05); }'
+    '.delete-btn { background: #ff4757; color: white; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }'
+    '.delete-btn:hover { background: #ff3742; }'
+    '.count { background: #0f3460; padding: 10px 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px; font-size: 13px; }'
+    '.count span { color: #2ed573; font-weight: 700; font-size: 18px; }'
+    '</style></head><body>'
+    '<a href="/" class="back">Back to App</a>'
+    '<h1>Admin Panel</h1>'
+    '<p class="subtitle">MediTranslate User Management</p>'
+    '<div class="count">Total users: <span>{{ users|length }}</span></div>'
+    '<table>'
+    '<tr><th>#</th><th>Name</th><th>Email</th><th>Registered</th><th>Action</th></tr>'
+    '{% for user in users %}'
+    '<tr>'
+    '<td>{{ loop.index }}</td>'
+    '<td>{{ user.name or "-" }}</td>'
+    '<td>{{ user.email }}</td>'
+    '<td>{{ user.created_at[:10] if user.created_at else "-" }}</td>'
+    '<td><button class="delete-btn" onclick="deleteUser({{ user.id }}, \'{{ user.email }}\')">Delete</button></td>'
+    '</tr>'
+    '{% endfor %}'
+    '</table>'
+    '<script>'
+    'async function deleteUser(id, email) {'
+    '  if (!confirm("Delete user " + email + "?")) return;'
+    '  var res = await fetch("/admin/delete/" + id, { method: "POST" });'
+    '  var data = await res.json();'
+    '  if (data.success) { location.reload(); }'
+    '  else { alert("Error: " + data.error); }'
+    '}'
+    '</script></body></html>'
+)
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+
+@app.route('/admin')
+def admin():
+    if request.args.get('pw') != ADMIN_PASSWORD:
+        return 'Access denied. Add ?pw=YOUR_PASSWORD to URL.', 403
+    db = get_db()
+    users = db.execute('SELECT * FROM users ORDER BY created_at DESC').fetchall()
+    db.close()
+    return render_template_string(ADMIN_HTML, users=users)
+
+@app.route('/admin/delete/<int:user_id>', methods=['POST'])
+def admin_delete(user_id):
+    if request.args.get('pw') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Access denied'}), 403
+    db = get_db()
+    db.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
